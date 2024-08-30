@@ -2,40 +2,43 @@
 
 import gymnasium as gym
 import numpy as np
+import pickle
 
-def run(episodes):
+def run(episodes, is_training=True, render=False):
 
     # Initializes the Environment
-    env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=False, render_mode='human')
+    env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=False, render_mode='human' if render else None)
 
-    # Create a Q-Learning Table
-    q = np.zeros((env.observation_space.n, env.action_space.n)) # init a 64 x 4 array
+    if(is_training):
+        # Create a Q-Learning Table
+        q = np.zeros((env.observation_space.n, env.action_space.n)) # 64 x 4
+    else:
+        f = open('frozen_lake8x8.pkl', 'rb')
+        q = pickle.load(f)
+        f.close()
 
     # Define Parameters
     learning_rate = 0.9 
-    discount_factor = 0.92
-    epsilon = 0.05
-    random_number = np.random.default_rng()
+    discount_factor = 0.9 
+    epsilon = 1         
+    epsilon_decay_rate = 0.00001        
+    random_number = np.random.default_rng()  
+
 
     for i in range(episodes):
         # Starting values
-        state = env.reset()[0] 
-        terminated = False # When the agent falls or reaches the goal
-        truncated = False  # When actions are greater than 200
-        number_of_steps = 0
-         
+        state = env.reset()[0]  
+        terminated = False      # True when falls or reaches goal
+        truncated = False       # If actions are greater than 200
+
         while(not terminated and not truncated):
-            # Use Epsilon-Greedy Exploration
-            if random_number.random() < epsilon:
+            # Use Epsilon-Decay Exploration
+            if is_training and random_number.random() < epsilon:
                 # Random Action
                 action = env.action_space.sample() 
-                print('------------------------')
-                print('random action')
             else:
                 action = np.argmax(q[state,:])
-                print('greedy action')
 
-            number_of_steps += 1
             next_state,reward,terminated,truncated,info = env.step(action)
 
             if reward == 0 and terminated == True:
@@ -44,19 +47,24 @@ def run(episodes):
                 reward = 100
             reward += -0.1
 
-            print(next_state,reward,terminated,truncated)
-            print(q[state,action])
-            print('------------------------')
-
-
-            q[state,action] = q[state,action] + learning_rate * (reward + discount_factor * np.max(q[next_state,:]) - q[state,action])
+            if is_training:
+                q[state,action] = q[state,action] + learning_rate * (reward + discount_factor * np.max(q[next_state,:]) - q[state,action])
 
             state = next_state
 
-    env.close()
+        epsilon = max(epsilon - epsilon_decay_rate, 0)
+
+        if(epsilon==0):
+            learning_rate = 0.0001
 
     
 
+    env.close()
+
+    if is_training:
+        f = open("frozen_lake8x8.pkl","wb")
+        pickle.dump(q, f)
+        f.close()
 
 if __name__ == '__main__':
-    run(3)
+    run(10, is_training=False, render=True)

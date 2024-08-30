@@ -54,4 +54,4 @@ def run(episodes):
 
 
 if __name__ == '__main__':
-    run(10)
+    run(2)
